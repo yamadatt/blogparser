@@ -106,6 +106,19 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		return nil, errors.New("有効なカテゴリがありません")
 	}
 
+	tags, err := extractTags(doc)
+	if err != nil {
+		return nil, errors.Wrap(err, "タグの抽出に失敗しました")
+	}
+
+	var validTags []string
+	for _, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag != "" && !containsString(validTags, tag) {
+			validTags = append(validTags, tag)
+		}
+	}
+
 	createdAt, err := extractDate(doc)
 	if err != nil {
 		createdAt = time.Time{} // 日付が見つからない場合はゼロ値
@@ -115,6 +128,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		Title:      title,
 		Content:    content,
 		Categories: validCategories,
+		Tags:       validTags,
 		CreatedAt:  createdAt,
 	}
 
