@@ -1,9 +1,11 @@
 package parser
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -30,19 +32,19 @@ func New() Parser {
 // ParseFiles は複数のファイルパスからブログ記事を解析します。
 func (p *HTMLParser) ParseFiles(paths []string) ([]*models.BlogPost, error) {
 	var posts []*models.BlogPost
-	var errs []error
+	var errMsgs []string
 
 	for _, path := range paths {
 		f, err := os.Open(path)
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "ファイル %s を開けません", path))
+			errMsgs = append(errMsgs, fmt.Sprintf("ファイル %s を開けません: %v", path, err))
 			continue
 		}
 
 		post, err := p.Parse(f)
 		f.Close()
 		if err != nil {
-			errs = append(errs, errors.Wrapf(err, "ファイル %s の解析に失敗しました", path))
+			errMsgs = append(errMsgs, fmt.Sprintf("ファイル %s の解析に失敗: %v", path, err))
 			continue
 		}
 
@@ -52,8 +54,9 @@ func (p *HTMLParser) ParseFiles(paths []string) ([]*models.BlogPost, error) {
 		posts = append(posts, post)
 	}
 
-	if len(errs) > 0 {
-		return posts, errors.Errorf("%d 件のエラーが発生しました", len(errs))
+	if len(errMsgs) > 0 {
+		return posts, errors.Errorf("%d 件のエラーが発生しました:\n- %s",
+			len(errMsgs), strings.Join(errMsgs, "\n- "))
 	}
 
 	return posts, nil
@@ -76,6 +79,15 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		return nil, errors.New("無効なタイトルです")
 	}
 
+	content, err := extractContent(doc)
+	if err != nil {
+		return nil, errors.Wrap(err, "コンテンツの抽出に失敗しました")
+	}
+
+	if !isValidContent(content) {
+		return nil, errors.New("無効なコンテンツです")
+	}
+
 	createdAt, err := extractDate(doc)
 	if err != nil {
 		createdAt = time.Time{} // 日付が見つからない場合はゼロ値
@@ -83,6 +95,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 
 	post := &models.BlogPost{
 		Title:     title,
+		Content:   content,
 		CreatedAt: createdAt,
 	}
 
