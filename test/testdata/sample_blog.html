@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Go言語での並行処理入門</title>
+    <meta property="og:title" content="Go言語での並行処理入門">
+    <meta property="og:description" content="Go言語でのgoroutineとchannelを使った並行処理の基本を解説します。">
+    <meta property="og:type" content="article">
+    <meta name="description" content="Go言語でのgoroutineとchannelを使った並行処理の基本を解説します。">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="/">Home</a>
+            <a href="/blog">Blog</a>
+        </nav>
+    </header>
+
+    <main>
+        <article>
+            <h1>Go言語での並行処理入門</h1>
+            
+            <div class="metadata">
+                <time datetime="2024-03-15">2024年3月15日</time>
+                <div class="categories">
+                    <a href="/categories/programming">プログラミング</a>
+                    <a href="/categories/golang">Go言語</a>
+                </div>
+                <div class="tags">
+                    <a href="/tags/goroutine">goroutine</a>
+                    <a href="/tags/channel">channel</a>
+                    <a href="/tags/concurrent">並行処理</a>
+                </div>
+            </div>
+
+            <div class="content">
+                <img src="/images/golang-concurrent.png" alt="Go言語の並行処理の図解" class="first-image">
+                
+                <p>Go言語は並行処理を簡単に実装できることが特徴の1つです。
+                この記事では、Go言語での並行処理の基本的な概念と実装方法について解説します。</p>
+
+                <h2>goroutineとは</h2>
+                <p>goroutineは、Go言語の軽量スレッドです。
+                通常のスレッドよりも少ないリソースで実行でき、数千、数万単位での並行実行が可能です。</p>
+
+                <h2>channelによる通信</h2>
+                <p>channelは、goroutine間でのデータの受け渡しを行うための機能です。
+                複数のgoroutine間で安全にデータを共有することができます。</p>
+
+                <pre><code>
+package main
+
+import "fmt"
+
+func main() {
+    ch := make(chan string)
+    go func() {
+        ch <- "Hello, Concurrent World!"
+    }()
+    msg := <-ch
+    fmt.Println(msg)
+}
+                </code></pre>
+
+                <h2>まとめ</h2>
+                <p>Go言語の並行処理は、goroutineとchannelを使うことで、
+                シンプルかつ効率的に実装することができます。</p>
+            </div>
+        </article>
+    </main>
+
+    <footer>
+        <p>&copy; 2024 Go Programming Blog</p>
+    </footer>
+</body>
+</html> 

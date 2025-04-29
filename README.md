@@ -1,6 +1,6 @@
 # Blogparser
 
-ブログファイル（HTML/Markdown）からメタデータと本文を抽出するGolangパッケージ
+ブログファイル（HTML）からメタデータと本文を抽出するGolangパッケージ
 
 ## 概要
 
@@ -178,5 +178,5 @@ func main() {
 
 - JSON/YAML出力対応
 - メタデータのカスタムフィールド対応
-- ブログプラットフォーム別のパーサー (WordPress, Hugo, etc.)
+- ブログプラットフォーム別のパーサー (WordPress)
 

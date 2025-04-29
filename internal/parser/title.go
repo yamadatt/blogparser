@@ -59,6 +59,8 @@ func cleanTitle(title string) string {
 	title = strings.ReplaceAll(title, "\n", " ")
 	// 連続する空白を1つに
 	title = strings.Join(strings.Fields(title), " ")
+	// ダブルクォーテーションをエスケープ
+	title = strings.ReplaceAll(title, "\"", "\\\"")
 	// 前後の空白を削除
 	return strings.TrimSpace(title)
 }

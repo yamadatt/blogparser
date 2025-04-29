@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/pkg/errors"
 	"github.com/yourusername/blogparser/internal/parser"
@@ -21,14 +20,9 @@ func run() error {
 		return errors.New("ファイルパスを指定してください")
 	}
 
-	pattern := os.Args[1]
-	files, err := filepath.Glob(pattern)
-	if err != nil {
-		return errors.Wrap(err, "ファイルパターンの展開に失敗しました")
-	}
-
+	files := os.Args[1:]
 	if len(files) == 0 {
-		return errors.Errorf("パターン %s に一致するファイルが見つかりません", pattern)
+		return errors.New("ファイルが指定されていません")
 	}
 
 	p := parser.New()
