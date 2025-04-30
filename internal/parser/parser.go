@@ -87,8 +87,11 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 	// コンテンツのクリーニング
 	content = p.CleanContent(content)
 
+	// サマリ生成
+	summary := p.GenerateSummary(content)
+
 	// デバッグ
-	// fmt.Println("ーーーーーーーーーーーーーーーーーーーーーーーーー", content)
+	// fmt.Println(content)
 
 	if !isValidContent(content) {
 		return nil, errors.New("無効なコンテンツです")
@@ -129,6 +132,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 	post := &models.BlogPost{
 		Title:      title,
 		Content:    content,
+		Summary:    summary,
 		Categories: validCategories,
 		Tags:       validTags,
 		CreatedAt:  createdAt,
