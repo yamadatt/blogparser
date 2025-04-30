@@ -17,12 +17,6 @@ func (p *HTMLParser) CleanContent(content string) string {
 		return content
 	}
 
-	// scriptタグを検索して表示
-	scripts := doc.Find("script")
-	if scripts.Length() > 0 {
-		fmt.Printf("scriptタグが%d個見つかりました\n", scripts.Length())
-	}
-
 	// 不要なタグを削除
 	doc.Find("script").Remove()
 	doc.Find("style").Remove()
