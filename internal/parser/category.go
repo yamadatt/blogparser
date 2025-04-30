@@ -106,11 +106,6 @@ func extractCategories(doc *goquery.Document) ([]string, error) {
 		}
 	})
 
-	// カテゴリが1つも見つからなかった場合はエラー
-	if len(categories) == 0 {
-		return nil, errors.New("カテゴリが見つかりません")
-	}
-
 	return categories, nil
 }
 

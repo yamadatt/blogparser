@@ -102,10 +102,6 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		}
 	}
 
-	if len(validCategories) == 0 {
-		return nil, errors.New("有効なカテゴリがありません")
-	}
-
 	tags, err := extractTags(doc)
 	if err != nil {
 		return nil, errors.Wrap(err, "タグの抽出に失敗しました")

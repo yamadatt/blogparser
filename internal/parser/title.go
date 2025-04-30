@@ -80,6 +80,8 @@ func cleanTitle(title string) string {
 	title = strings.Join(strings.Fields(title), " ")
 	// ダブルクォーテーションをエスケープ
 	title = strings.ReplaceAll(title, "\"", "\\\"")
+	// 特定の文字列を削除
+	title = strings.ReplaceAll(title, " | 心理カウンセラー・中井亜紀『成長の記録』", "")
 	// 前後の空白を削除
 	return strings.TrimSpace(title)
 }
