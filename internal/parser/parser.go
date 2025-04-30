@@ -84,6 +84,12 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		return nil, errors.Wrap(err, "コンテンツの抽出に失敗しました")
 	}
 
+	// コンテンツのクリーニング
+	content = p.CleanContent(content)
+
+	// デバッグ
+	// fmt.Println("ーーーーーーーーーーーーーーーーーーーーーーーーー", content)
+
 	if !isValidContent(content) {
 		return nil, errors.New("無効なコンテンツです")
 	}

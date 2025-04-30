@@ -55,16 +55,11 @@ func extractTags(doc *goquery.Document) ([]string, error) {
 
 	for _, selector := range selectors {
 		doc.Find(selector).Each(func(i int, s *goquery.Selection) {
-			tag := strings.TrimSpace(s.Text())
+			tag := cleanTag(s.Text())
 			if tag != "" && !containsString(tags, tag) {
 				tags = append(tags, tag)
 			}
 		})
-	}
-
-	// セレクタからタグが見つかった場合は返す
-	if len(tags) > 0 {
-		return tags, nil
 	}
 
 	// 2. ld_blog_varsからtagsを抽出
@@ -78,7 +73,7 @@ func extractTags(doc *goquery.Document) ([]string, error) {
 				tagMatches := tagRe.FindAllStringSubmatch(tagsStr, -1)
 				for _, tm := range tagMatches {
 					if len(tm) > 1 {
-						tag := strings.TrimSpace(tm[1])
+						tag := cleanTag(tm[1])
 						if tag != "" && !containsString(tags, tag) {
 							tags = append(tags, tag)
 						}
@@ -88,22 +83,14 @@ func extractTags(doc *goquery.Document) ([]string, error) {
 		}
 	})
 
-	if len(tags) > 0 {
-		return tags, nil
-	}
-
 	// 3. meta[name="keywords"]から抽出
 	if keywords, exists := doc.Find("meta[name='keywords']").Attr("content"); exists {
 		for _, tag := range strings.Split(keywords, ",") {
-			tag = strings.TrimSpace(tag)
+			tag := cleanTag(tag)
 			if tag != "" && !containsString(tags, tag) {
 				tags = append(tags, tag)
 			}
 		}
-	}
-
-	if len(tags) > 0 {
-		return tags, nil
 	}
 
 	// 4. .tag, .tags, .entry-tags, .post-tags などのテキストから抽出
@@ -112,16 +99,36 @@ func extractTags(doc *goquery.Document) ([]string, error) {
 	}
 	for _, selector := range textSelectors {
 		doc.Find(selector).Each(func(i int, s *goquery.Selection) {
-			tag := strings.TrimSpace(s.Text())
+			tag := cleanTag(s.Text())
 			if tag != "" && !containsString(tags, tag) {
 				tags = append(tags, tag)
 			}
 		})
 	}
 
-	if len(tags) == 0 {
-		return nil, errors.New("タグが見つかりません")
-	}
-
 	return tags, nil
+}
+
+// cleanTag はタグテキストを整形します。
+func cleanTag(tag string) string {
+	// 前後の空白を削除
+	tag = strings.TrimSpace(tag)
+
+	// 特定の文字列を削除
+	tag = strings.ReplaceAll(tag, "心理カウンセラー・中井亜紀『成長の記録』", "")
+
+	// 一般的なタグとして不適切な文字列を削除
+	tag = strings.ReplaceAll(tag, "ブログ", "")
+
+	// 改行を削除
+	tag = strings.ReplaceAll(tag, "\n", " ")
+
+	// 先頭の#を削除
+	tag = strings.TrimPrefix(tag, "#")
+
+	// 連続する空白を1つに
+	tag = strings.Join(strings.Fields(tag), " ")
+
+	// 前後の空白を再度削除
+	return strings.TrimSpace(tag)
 }
