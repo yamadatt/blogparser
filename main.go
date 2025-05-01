@@ -38,7 +38,7 @@ func run() error {
 		fmt.Printf("作成日時: %s\n", post.CreatedAt)
 		fmt.Printf("カテゴリ: %v\n", post.Categories)
 		fmt.Printf("タグ: %v\n", post.Tags)
-		fmt.Printf("本文の長さ: %d文字\n", post.Content)
+		fmt.Printf("本文の長さ: %d文字\n", len(post.Content))
 		fmt.Printf("最初の画像: %s\n", post.FirstImage)
 		fmt.Println("----------------------")
 	}
