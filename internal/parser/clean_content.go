@@ -6,10 +6,54 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
+)
+
+var (
+	// 削除対象のタグ
+	removeTags = []string{
+		"script",
+		"style",
+		"iframe",
+		".google-auto-placed",
+		"dl.article-tags",
+		"div.blogroll1",
+		"div.rss2-title",
+		"a[href*='newresu1.blog.fc2.com']",
+		"div.ad-entry-bottom",
+		"div.POST_TAIL",
+		"hr[style*='191970']",
+	}
+
+	// アメブロ特有の削除対象要素
+	amebloRemoveSelectors = map[string][]string{
+		".skin-entryBody, .skin-entryBody2": {
+			// 広告関連の要素
+			".google-auto-placed",
+			".adsbygoogle",
+			".blogroll-ad",
+			// SNSボタン関連の要素
+			".social-btn",
+			".share-btn",
+			".twitter-share-button",
+		},
+	}
+
+	// 正規表現による削除パターン
+	regexPatterns = []struct {
+		pattern     string
+		description string
+	}{
+		{`<!--[\s\S]*?-->`, "HTMLコメントを削除"},
+		{`[１-９一二三四五六七八九十]位：`, "順位表記を削除"},
+	}
 )
 
 // CleanContent はHTMLコンテンツをクリーニングし、HTMLのまま返します。
 func (p *HTMLParser) CleanContent(content string) string {
+	// 正規表現による削除
+	content = p.removeByRegex(content)
+
 	// HTMLをパース
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 	if err != nil {
@@ -18,18 +62,18 @@ func (p *HTMLParser) CleanContent(content string) string {
 	}
 
 	// 不要なタグを削除
-	doc.Find("script").Remove()
-	doc.Find("style").Remove()
-	doc.Find("iframe").Remove()
-	doc.Find(".google-auto-placed").Remove()
+	for _, selector := range removeTags {
+		doc.Find(selector).Remove()
+	}
 
 	// アメブロ特有の不要な要素を削除
-	doc.Find(".skin-entryBody, .skin-entryBody2").Each(func(i int, s *goquery.Selection) {
-		// 広告関連の要素を削除
-		s.Find(".google-auto-placed, .adsbygoogle, .blogroll-ad").Remove()
-		// SNSボタン関連の要素を削除
-		s.Find(".social-btn, .share-btn, .twitter-share-button").Remove()
-	})
+	for parentSelector, childSelectors := range amebloRemoveSelectors {
+		doc.Find(parentSelector).Each(func(i int, s *goquery.Selection) {
+			for _, selector := range childSelectors {
+				s.Find(selector).Remove()
+			}
+		})
+	}
 
 	// HTMLとして取得
 	html, err := doc.Find("body").Html()
@@ -41,6 +85,52 @@ func (p *HTMLParser) CleanContent(content string) string {
 	// html = p.normalizeWhitespace(html)
 
 	return html
+}
+
+// removeByRegex は正規表現パターンに基づいてコンテンツを削除します
+func (p *HTMLParser) removeByRegex(content string) string {
+	for _, pattern := range regexPatterns {
+		re := regexp.MustCompile(pattern.pattern)
+		content = re.ReplaceAllString(content, "")
+	}
+	return content
+}
+
+// renderNode はHTMLノードを文字列に変換します（コメントノードは除外）
+func (p *HTMLParser) renderNode(buf *strings.Builder, node *html.Node) {
+	if node.Type == html.CommentNode {
+		return
+	}
+
+	switch node.Type {
+	case html.TextNode:
+		buf.WriteString(node.Data)
+	case html.ElementNode:
+		buf.WriteByte('<')
+		buf.WriteString(node.Data)
+		for _, attr := range node.Attr {
+			buf.WriteByte(' ')
+			buf.WriteString(attr.Key)
+			buf.WriteString(`="`)
+			buf.WriteString(attr.Val)
+			buf.WriteByte('"')
+		}
+		if node.FirstChild != nil {
+			buf.WriteByte('>')
+			for c := node.FirstChild; c != nil; c = c.NextSibling {
+				p.renderNode(buf, c)
+			}
+			buf.WriteString("</")
+			buf.WriteString(node.Data)
+			buf.WriteByte('>')
+		} else {
+			buf.WriteString("/>")
+		}
+	}
+
+	if node.NextSibling != nil {
+		p.renderNode(buf, node.NextSibling)
+	}
 }
 
 // normalizeWhitespace は空白や改行を正規化します

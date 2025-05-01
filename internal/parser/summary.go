@@ -183,12 +183,6 @@ func sqrt(x float64) float64 {
 	return z
 }
 
-// stripHTMLTags はHTMLタグを除去します
-func stripHTMLTags(html string) string {
-	re := regexp.MustCompile(`<[^>]*>`)
-	return re.ReplaceAllString(html, "")
-}
-
 // splitSentences は句点（。や.）で文を分割します
 func splitSentences(text string) []string {
 	re := regexp.MustCompile(`.*?[。.]`)
