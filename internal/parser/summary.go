@@ -11,6 +11,12 @@ import (
 	"github.com/ikawaha/kagome/v2/tokenizer"
 )
 
+// BM25のパラメータ
+const (
+	k1 = 1.2  // 単語頻度の飽和度パラメータ
+	b  = 0.75 // 文書長正規化パラメータ
+)
+
 // 品詞の重み付け
 var posWeights = map[string]float64{
 	"名詞-固有名詞": 2.0,
@@ -27,34 +33,94 @@ type Word struct {
 	Lemma   string  // 基本形
 	POS     string  // 品詞
 	Weight  float64 // 重み
+	TF      float64 // その文での出現頻度
+	IDF     float64 // 逆文書頻度
+}
+
+// BM25Score は文のBM25スコアを計算します
+func calculateBM25Score(doc []Word, docs [][]Word, avgDocLen float64) float64 {
+	score := 0.0
+	docLen := float64(len(doc))
+
+	for _, word := range doc {
+		// 単語の文書頻度を計算
+		df := 0
+		for _, d := range docs {
+			if containsWord(d, word.Lemma) {
+				df++
+			}
+		}
+
+		// IDFの計算
+		docsLen := float64(len(docs))
+		dfFloat := float64(df)
+		idf := math.Log((docsLen - dfFloat + 0.5) / (dfFloat + 0.5))
+		if idf < 0 {
+			idf = 0 // IDFが負になるのを防ぐ
+		}
+
+		// TFの計算（文書内での単語頻度）
+		tf := calculateTF(doc, word.Lemma)
+
+		// BM25スコアの計算
+		numerator := tf * (k1 + 1)
+		denominator := tf + k1*(1-b+b*docLen/avgDocLen)
+		score += idf * numerator / denominator * word.Weight // 品詞の重みも考慮
+	}
+
+	return score
+}
+
+// calculateTF は単語の出現頻度を計算します
+func calculateTF(doc []Word, lemma string) float64 {
+	count := 0.0
+	for _, word := range doc {
+		if word.Lemma == lemma {
+			count++
+		}
+	}
+	return count
+}
+
+// containsWord は文書に指定された単語が含まれているかチェックします
+func containsWord(doc []Word, lemma string) bool {
+	for _, word := range doc {
+		if word.Lemma == lemma {
+			return true
+		}
+	}
+	return false
 }
 
 // GenerateSummary は記事本文からサマリ（要約）を生成します。
-// TextRankアルゴリズムを使用して重要な文を抽出します。
 func (p *HTMLParser) GenerateSummary(content string) string {
-	// 1. HTML → テキスト変換
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 	if err != nil {
 		return ""
 	}
 	text := doc.Find("body").Text()
-
-	// 2. テキストの正規化
 	text = p.normalizeWhitespace(text)
 
-	// 3. 文分割
-	sentences := splitSentences(text)
+	sentences := p.splitSentences(text)
 	if len(sentences) <= 2 {
-		return text // 文が少ない場合は全文を返す
+		return text
 	}
 
-	// 4. 形態素解析と文のベクトル化
+	// 形態素解析と文のベクトル化
 	vectors := make([][]Word, len(sentences))
 	t, err := tokenizer.New(ipa.Dict())
 	if err != nil {
 		return text
 	}
 
+	// 平均文長の計算
+	var totalLen float64
+	for _, sent := range sentences {
+		totalLen += float64(len(sent))
+	}
+	avgDocLength := totalLen / float64(len(sentences))
+
+	// 各文をベクトル化
 	for i, sentence := range sentences {
 		tokens := t.Tokenize(sentence)
 		var words []Word
@@ -64,18 +130,16 @@ func (p *HTMLParser) GenerateSummary(content string) string {
 				continue
 			}
 
-			// 品詞情報の取得
 			pos := features[0]
 			if len(features) > 1 {
 				pos += "-" + features[1]
 			}
 
-			// 重要な品詞のみを対象とする
 			weight := getWordWeight(pos)
 			if weight > 0 {
 				word := Word{
 					Surface: token.Surface,
-					Lemma:   features[6], // 基本形
+					Lemma:   features[6],
 					POS:     pos,
 					Weight:  weight,
 				}
@@ -85,30 +149,26 @@ func (p *HTMLParser) GenerateSummary(content string) string {
 		vectors[i] = words
 	}
 
-	// 5. TextRankの計算
-	scores := calculateTextRank(vectors)
+	// BM25スコアの計算
+	scores := make([]float64, len(sentences))
+	for i, vec := range vectors {
+		scores[i] = calculateBM25Score(vec, vectors, avgDocLength)
+	}
 
-	// 6. 上位2文を選択（文の長さで重み付け）
+	// スコアの高い文を選択
 	type SentenceScore struct {
 		index int
 		score float64
 	}
 	var ranked []SentenceScore
 	for i, score := range scores {
-		// 極端に短い文や長い文にペナルティを与える
-		length := len(sentences[i])
-		if length < 10 {
-			score *= 0.5
-		} else if length > 200 {
-			score *= 0.8
-		}
 		ranked = append(ranked, SentenceScore{i, score})
 	}
 	sort.Slice(ranked, func(i, j int) bool {
 		return ranked[i].score > ranked[j].score
 	})
 
-	// 7. 文の順序を維持して結合
+	// 上位2文を元の順序で結合
 	var summary []string
 	for i := 0; i < len(sentences) && len(summary) < 2; i++ {
 		for _, r := range ranked {
@@ -139,133 +199,62 @@ func getWordWeight(pos string) float64 {
 	return 0
 }
 
-// calculateTextRank は文のベクトル表現からTextRankスコアを計算します
-func calculateTextRank(vectors [][]Word) []float64 {
-	n := len(vectors)
-	if n == 0 {
-		return nil
-	}
-
-	// 類似度行列の作成
-	similarity := make([][]float64, n)
-	for i := range similarity {
-		similarity[i] = make([]float64, n)
-	}
-
-	// コサイン類似度の計算
-	for i := 0; i < n; i++ {
-		for j := 0; j < n; j++ {
-			if i != j {
-				similarity[i][j] = calculateSimilarity(vectors[i], vectors[j])
-			}
-		}
-	}
-
-	// TextRankの反復計算
-	scores := make([]float64, n)
-	for i := range scores {
-		scores[i] = 1.0
-	}
-
-	d := 0.85 // ダンピング係数
-	iterations := 30
-
-	for iter := 0; iter < iterations; iter++ {
-		newScores := make([]float64, n)
-		for i := 0; i < n; i++ {
-			sum := 0.0
-			for j := 0; j < n; j++ {
-				if i != j {
-					weightSum := 0.0
-					for k := 0; k < n; k++ {
-						if k != j {
-							weightSum += similarity[j][k]
-						}
-					}
-					if weightSum > 0 {
-						sum += similarity[j][i] * scores[j] / weightSum
-					}
-				}
-			}
-			newScores[i] = (1 - d) + d*sum
-		}
-		scores = newScores
-	}
-
-	return scores
-}
-
-// calculateSimilarity は2つの文ベクトル間の重み付きコサイン類似度を計算します
-func calculateSimilarity(vec1, vec2 []Word) float64 {
-	// 単語の重み付き出現をカウント
-	count1 := make(map[string]float64)
-	count2 := make(map[string]float64)
-
-	for _, word := range vec1 {
-		// 基本形をキーとして使用
-		count1[word.Lemma] += word.Weight
-	}
-	for _, word := range vec2 {
-		count2[word.Lemma] += word.Weight
-	}
-
-	// 内積の計算
-	dotProduct := 0.0
-	for word, count := range count1 {
-		if count2[word] > 0 {
-			dotProduct += count * count2[word]
-		}
-	}
-
-	// ベクトルの大きさを計算
-	magnitude1 := 0.0
-	for _, count := range count1 {
-		magnitude1 += count * count
-	}
-	magnitude2 := 0.0
-	for _, count := range count2 {
-		magnitude2 += count * count
-	}
-
-	// コサイン類似度を計算
-	if magnitude1 == 0 || magnitude2 == 0 {
-		return 0
-	}
-	return dotProduct / (math.Sqrt(magnitude1) * math.Sqrt(magnitude2))
-}
-
 // splitSentences は文を分割します
-func splitSentences(text string) []string {
-	// 1. 括弧内の句点を一時的に置換
-	text = replaceBracketContent(text)
-
-	// 2. 文分割のパターン
-	patterns := []string{
-		`[。．.！!？?]`,   // 基本的な句読点
-		`。」`,          // 会話文の終わり
-		`。）`,          // 括弧付きの文の終わり
-		`[;\n]`,       // セミコロンと改行
-		`。[\s]*[\n]+`, // 句点+改行
-		`^[\s]*[•●・]`, // 箇条書きの開始
+func (p *HTMLParser) splitSentences(text string) []string {
+	t, err := tokenizer.New(ipa.Dict())
+	if err != nil {
+		return []string{text}
 	}
 
-	// 3. パターンを組み合わせて分割
-	pattern := "(" + strings.Join(patterns, "|") + ")"
-	re := regexp.MustCompile(pattern)
-	parts := re.Split(text, -1)
-
-	// 4. 空の文を除去し、意味のある文のみを保持
 	var sentences []string
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if len(part) > 0 {
-			// 括弧内の句点を復元
-			part = restoreBracketContent(part)
-			sentences = append(sentences, part)
+	var currentSentence []string
+	tokens := t.Tokenize(text)
+
+	for _, token := range tokens {
+		surface := token.Surface
+		features := token.Features()
+
+		// 句点や感嘆符などで文を区切る
+		if isSentenceEnd(surface, features) {
+			currentSentence = append(currentSentence, surface)
+			sentence := strings.Join(currentSentence, "")
+			sentence = strings.TrimSpace(sentence)
+			if sentence != "" {
+				sentences = append(sentences, sentence)
+			}
+			currentSentence = currentSentence[:0]
+		} else {
+			currentSentence = append(currentSentence, surface)
+		}
+	}
+
+	// 最後の文を追加
+	if len(currentSentence) > 0 {
+		sentence := strings.Join(currentSentence, "")
+		sentence = strings.TrimSpace(sentence)
+		if sentence != "" {
+			sentences = append(sentences, sentence)
 		}
 	}
 
 	return sentences
+}
+
+// isSentenceEnd は文末かどうかを判定します
+func isSentenceEnd(surface string, features []string) bool {
+	// 句読点チェック
+	if surface == "。" || surface == "！" || surface == "？" ||
+		surface == "." || surface == "!" || surface == "?" {
+		return true
+	}
+
+	// 品詞チェック
+	if len(features) > 1 && features[0] == "記号" &&
+		(features[1] == "句点" || features[1] == "終助詞") {
+		return true
+	}
+
+	return false
 }
 
 // replaceBracketContent は括弧内のテキストを一時的に置換します
