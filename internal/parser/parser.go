@@ -129,6 +129,13 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		createdAt = time.Time{} // 日付が見つからない場合はゼロ値
 	}
 
+	html, _ := doc.Html()
+	images := p.ExtractImages(html)
+	firstImage := ""
+	if len(images) > 0 {
+		firstImage = images[0].URL
+	}
+
 	post := &models.BlogPost{
 		Title:      title,
 		Content:    content,
@@ -136,6 +143,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 		Categories: validCategories,
 		Tags:       validTags,
 		CreatedAt:  createdAt,
+		FirstImage: firstImage,
 	}
 
 	return post, nil
