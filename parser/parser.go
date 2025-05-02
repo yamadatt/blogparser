@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/yourusername/blogparser/pkg/models"
+	"github.com/yamadatt/blogparser/pkg/models"
 	"go.uber.org/zap"
 )
 
