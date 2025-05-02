@@ -6,7 +6,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/yourusername/blogparser/parser"
+	"github.com/yamadatt/blogparser/parser"
 )
 
 func main() {
