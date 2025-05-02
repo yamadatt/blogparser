@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,8 +10,8 @@ import (
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 	"github.com/yourusername/blogparser/pkg/models"
+	"go.uber.org/zap"
 )
 
 // Parser はブログ記事をパースするためのインターフェースです。
@@ -22,11 +23,15 @@ type Parser interface {
 }
 
 // HTMLParser はHTMLファイルからブログ記事を解析するパーサーです。
-type HTMLParser struct{}
+type HTMLParser struct {
+	logger *zap.Logger
+}
 
 // New は新しいHTMLParserを作成します。
 func New() Parser {
-	return &HTMLParser{}
+	return &HTMLParser{
+		logger: zap.NewNop(),
+	}
 }
 
 // ParseFiles は複数のファイルパスからブログ記事を解析します。
@@ -55,7 +60,7 @@ func (p *HTMLParser) ParseFiles(paths []string) ([]*models.BlogPost, error) {
 	}
 
 	if len(errMsgs) > 0 {
-		return posts, errors.Errorf("%d 件のエラーが発生しました:\n- %s",
+		return posts, fmt.Errorf("%d 件のエラーが発生しました:\n- %s",
 			len(errMsgs), strings.Join(errMsgs, "\n- "))
 	}
 
@@ -66,12 +71,12 @@ func (p *HTMLParser) ParseFiles(paths []string) ([]*models.BlogPost, error) {
 func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
-		return nil, errors.Wrap(err, "HTMLのパースに失敗しました")
+		return nil, fmt.Errorf("HTMLのパースに失敗しました: %w", err)
 	}
 
 	title, err := extractTitle(doc)
 	if err != nil {
-		return nil, errors.Wrap(err, "タイトルの抽出に失敗しました")
+		return nil, fmt.Errorf("タイトルの抽出に失敗しました: %w", err)
 	}
 
 	title = cleanTitle(title)
@@ -81,17 +86,20 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 
 	content, err := extractContent(doc)
 	if err != nil {
-		return nil, errors.Wrap(err, "コンテンツの抽出に失敗しました")
+		return nil, fmt.Errorf("コンテンツの抽出に失敗しました: %w", err)
 	}
 
 	// コンテンツのクリーニング
-	content = p.CleanContent(content)
+	content, err = p.CleanContent(content)
+	if err != nil {
+		return nil, fmt.Errorf("コンテンツのクリーニングに失敗しました: %w", err)
+	}
 
 	// サマリ生成
-	summary := p.GenerateSummary(content)
-
-	// デバッグ
-	// fmt.Println(content)
+	summary, err := p.GenerateSummary(content)
+	if err != nil {
+		return nil, fmt.Errorf("サマリの生成に失敗しました: %w", err)
+	}
 
 	if !isValidContent(content) {
 		return nil, errors.New("無効なコンテンツです")
@@ -99,7 +107,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 
 	categories, err := extractCategories(doc)
 	if err != nil {
-		return nil, errors.Wrap(err, "カテゴリの抽出に失敗しました")
+		return nil, fmt.Errorf("カテゴリの抽出に失敗しました: %w", err)
 	}
 
 	// カテゴリの検証
@@ -113,7 +121,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 
 	tags, err := extractTags(doc)
 	if err != nil {
-		return nil, errors.Wrap(err, "タグの抽出に失敗しました")
+		return nil, fmt.Errorf("タグの抽出に失敗しました: %w", err)
 	}
 
 	var validTags []string

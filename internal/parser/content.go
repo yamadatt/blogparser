@@ -1,11 +1,11 @@
 package parser
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 )
 
 // extractContent はHTMLドキュメントから記事の本文を抽出します。
@@ -109,7 +109,7 @@ func extractContent(doc *goquery.Document) (string, error) {
 		extractionAttempts = append(extractionAttempts, "body タグ: 見つかりません")
 	}
 
-	return "", errors.Errorf("コンテンツ抽出に失敗しました。試行結果:\n%s", strings.Join(extractionAttempts, "\n- "))
+	return "", fmt.Errorf("コンテンツ抽出に失敗しました。試行結果:\n%s", strings.Join(extractionAttempts, "\n- "))
 }
 
 // normalizeHTML はHTML文字列を整形します。

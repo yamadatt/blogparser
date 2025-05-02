@@ -1,14 +1,15 @@
 package parser
 
 import (
+	"fmt"
 	"math"
-	"regexp"
 	"sort"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/ikawaha/kagome-dict/ipa"
 	"github.com/ikawaha/kagome/v2/tokenizer"
+	"go.uber.org/zap"
 )
 
 // BM25のパラメータ
@@ -93,24 +94,29 @@ func containsWord(doc []Word, lemma string) bool {
 }
 
 // GenerateSummary は記事本文からサマリ（要約）を生成します。
-func (p *HTMLParser) GenerateSummary(content string) string {
+func (p *HTMLParser) GenerateSummary(content string) (string, error) {
+	if content == "" {
+		return "", ErrEmptyContent
+	}
+
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("HTMLのパース中にエラーが発生しました: %w", err)
 	}
 	text := doc.Find("body").Text()
 	text = p.normalizeWhitespace(text)
 
 	sentences := p.splitSentences(text)
 	if len(sentences) <= 2 {
-		return text
+		return text, nil
 	}
 
 	// 形態素解析と文のベクトル化
 	vectors := make([][]Word, len(sentences))
-	t, err := tokenizer.New(ipa.Dict())
-	if err != nil {
-		return text
+
+	// エラー処理を追加
+	if err := p.processVectors(vectors, sentences); err != nil {
+		return "", fmt.Errorf("文のベクトル化に失敗しました: %w", err)
 	}
 
 	// 平均文長の計算
@@ -119,35 +125,6 @@ func (p *HTMLParser) GenerateSummary(content string) string {
 		totalLen += float64(len(sent))
 	}
 	avgDocLength := totalLen / float64(len(sentences))
-
-	// 各文をベクトル化
-	for i, sentence := range sentences {
-		tokens := t.Tokenize(sentence)
-		var words []Word
-		for _, token := range tokens {
-			features := token.Features()
-			if len(features) < 7 {
-				continue
-			}
-
-			pos := features[0]
-			if len(features) > 1 {
-				pos += "-" + features[1]
-			}
-
-			weight := getWordWeight(pos)
-			if weight > 0 {
-				word := Word{
-					Surface: token.Surface,
-					Lemma:   features[6],
-					POS:     pos,
-					Weight:  weight,
-				}
-				words = append(words, word)
-			}
-		}
-		vectors[i] = words
-	}
 
 	// BM25スコアの計算
 	scores := make([]float64, len(sentences))
@@ -179,7 +156,60 @@ func (p *HTMLParser) GenerateSummary(content string) string {
 		}
 	}
 
-	return strings.Join(summary, "")
+	return strings.Join(summary, ""), nil
+}
+
+// processVectors は文のベクトル化を行います
+func (p *HTMLParser) processVectors(vectors [][]Word, sentences []string) error {
+	for i, sentence := range sentences {
+		words, err := p.tokenize(sentence)
+		if err != nil {
+			return fmt.Errorf("形態素解析に失敗しました: %w", err)
+		}
+		vectors[i] = words
+	}
+	return nil
+}
+
+// tokenize は文を形態素解析します
+func (p *HTMLParser) tokenize(text string) ([]Word, error) {
+	t, err := tokenizer.New(ipa.Dict())
+	if err != nil {
+		if p.logger != nil {
+			p.logger.Error("形態素解析器の初期化に失敗しました",
+				zap.Error(err),
+			)
+		}
+		return nil, fmt.Errorf("%w: 形態素解析器の初期化に失敗しました", ErrTokenizer)
+	}
+
+	var words []Word
+	tokens := t.Tokenize(text)
+
+	for _, token := range tokens {
+		features := token.Features()
+		if len(features) < 7 {
+			continue
+		}
+
+		pos := features[0]
+		if len(features) > 1 {
+			pos += "-" + features[1]
+		}
+
+		weight := getWordWeight(pos)
+		if weight > 0 {
+			word := Word{
+				Surface: token.Surface,
+				Lemma:   features[6],
+				POS:     pos,
+				Weight:  weight,
+			}
+			words = append(words, word)
+		}
+	}
+
+	return words, nil
 }
 
 // getWordWeight は品詞に基づいて単語の重要度を返します
@@ -201,43 +231,15 @@ func getWordWeight(pos string) float64 {
 
 // splitSentences は文を分割します
 func (p *HTMLParser) splitSentences(text string) []string {
-	t, err := tokenizer.New(ipa.Dict())
-	if err != nil {
-		return []string{text}
-	}
-
-	var sentences []string
-	var currentSentence []string
-	tokens := t.Tokenize(text)
-
-	for _, token := range tokens {
-		surface := token.Surface
-		features := token.Features()
-
-		// 句点や感嘆符などで文を区切る
-		if isSentenceEnd(surface, features) {
-			currentSentence = append(currentSentence, surface)
-			sentence := strings.Join(currentSentence, "")
-			sentence = strings.TrimSpace(sentence)
-			if sentence != "" {
-				sentences = append(sentences, sentence)
-			}
-			currentSentence = currentSentence[:0]
-		} else {
-			currentSentence = append(currentSentence, surface)
+	sentences := strings.Split(text, "。")
+	var result []string
+	for _, s := range sentences {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			result = append(result, s)
 		}
 	}
-
-	// 最後の文を追加
-	if len(currentSentence) > 0 {
-		sentence := strings.Join(currentSentence, "")
-		sentence = strings.TrimSpace(sentence)
-		if sentence != "" {
-			sentences = append(sentences, sentence)
-		}
-	}
-
-	return sentences
+	return result
 }
 
 // isSentenceEnd は文末かどうかを判定します
@@ -255,17 +257,4 @@ func isSentenceEnd(surface string, features []string) bool {
 	}
 
 	return false
-}
-
-// replaceBracketContent は括弧内のテキストを一時的に置換します
-func replaceBracketContent(text string) string {
-	re := regexp.MustCompile(`[（(][^）)]*[）)]`)
-	return re.ReplaceAllStringFunc(text, func(s string) string {
-		return strings.ReplaceAll(s, "。", "@@PERIOD@@")
-	})
-}
-
-// restoreBracketContent は括弧内のテキストを復元します
-func restoreBracketContent(text string) string {
-	return strings.ReplaceAll(text, "@@PERIOD@@", "。")
 }

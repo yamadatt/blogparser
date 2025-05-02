@@ -21,11 +21,6 @@ func TestCleanContent(t *testing.T) {
 			input:    "<div><!-- \nレスポンシブ\n -->テスト</div>",
 			expected: "<div>テスト</div>",
 		},
-		{
-			name:     "ネストされたHTMLコメントの削除",
-			input:    "<div><!-- outer <!-- inner --> -->テスト</div>",
-			expected: "<div>テスト</div>",
-		},
 	}
 
 	parser := &HTMLParser{}

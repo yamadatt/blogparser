@@ -1,11 +1,11 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/yourusername/blogparser/internal/parser"
 )
 
@@ -28,7 +28,7 @@ func run() error {
 	p := parser.New()
 	posts, err := p.ParseFiles(files)
 	if err != nil {
-		return errors.Wrap(err, "ファイルの解析に失敗しました")
+		return fmt.Errorf("ファイルの解析に失敗しました: %w", err)
 	}
 
 	for _, post := range posts {

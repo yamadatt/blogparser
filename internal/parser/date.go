@@ -1,11 +1,12 @@
 package parser
 
 import (
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 )
 
 // extractDate はHTMLドキュメントから公開日時を抽出します。
@@ -132,5 +133,5 @@ func parseDateString(s string) (time.Time, error) {
 			return t, nil
 		}
 	}
-	return time.Time{}, errors.Errorf("日付のパースに失敗: %s", s)
+	return time.Time{}, fmt.Errorf("日付のパースに失敗: %s", s)
 }

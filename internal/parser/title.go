@@ -1,11 +1,11 @@
 package parser
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 )
 
 // extractTitle はHTMLドキュメントからタイトルを抽出します。

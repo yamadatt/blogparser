@@ -1,11 +1,11 @@
 package parser
 
 import (
+	"errors"
 	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/pkg/errors"
 )
 
 // extractTags はHTMLドキュメントからタグを抽出します。

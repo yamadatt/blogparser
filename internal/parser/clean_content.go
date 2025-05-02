@@ -50,15 +50,18 @@ var (
 )
 
 // CleanContent はHTMLコンテンツをクリーニングし、HTMLのまま返します。
-func (p *HTMLParser) CleanContent(content string) string {
+func (p *HTMLParser) CleanContent(content string) (string, error) {
+	if content == "" {
+		return "", ErrEmptyContent
+	}
+
 	// 正規表現による削除
 	content = p.removeByRegex(content)
 
 	// HTMLをパース
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(content))
 	if err != nil {
-		fmt.Println("HTMLのパースに失敗しました:", err)
-		return content
+		return "", fmt.Errorf("%w: %v", ErrParseHTML, err)
 	}
 
 	// 不要なタグを削除
@@ -77,14 +80,18 @@ func (p *HTMLParser) CleanContent(content string) string {
 
 	// HTMLとして取得
 	html, err := doc.Find("body").Html()
-	if err != nil || html == "" {
-		html, _ = doc.Html()
+	if err != nil {
+		html, err = doc.Html()
+		if err != nil {
+			return "", fmt.Errorf("HTMLの生成に失敗しました: %w", err)
+		}
 	}
 
-	// 空白行を正規化（HTMLなので不要ならコメントアウト可）
-	// html = p.normalizeWhitespace(html)
+	if html == "" {
+		return "", ErrEmptyContent
+	}
 
-	return html
+	return html, nil
 }
 
 // removeByRegex は正規表現パターンに基づいてコンテンツを削除します
