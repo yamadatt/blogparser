@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -85,12 +86,11 @@ func calculateTF(doc []Word, lemma string) float64 {
 
 // containsWord は文書に指定された単語が含まれているかチェックします
 func containsWord(doc []Word, lemma string) bool {
-	for _, word := range doc {
-		if word.Lemma == lemma {
-			return true
-		}
+	lemmas := make([]string, len(doc))
+	for i, word := range doc {
+		lemmas[i] = word.Lemma
 	}
-	return false
+	return slices.Contains(lemmas, lemma)
 }
 
 // GenerateSummary は記事本文からサマリ（要約）を生成します。

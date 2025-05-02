@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -163,10 +164,5 @@ func isValidCategory(category string) bool {
 
 // containsString は文字列スライスに特定の文字列が含まれているかを確認します。
 func containsString(slice []string, str string) bool {
-	for _, s := range slice {
-		if s == str {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, str)
 }

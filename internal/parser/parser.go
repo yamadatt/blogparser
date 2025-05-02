@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -127,7 +128,7 @@ func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
 	var validTags []string
 	for _, tag := range tags {
 		tag = strings.TrimSpace(tag)
-		if tag != "" && !containsString(validTags, tag) {
+		if tag != "" && !slices.Contains(validTags, tag) {
 			validTags = append(validTags, tag)
 		}
 	}
