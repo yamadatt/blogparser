@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -25,13 +26,15 @@ func run() error {
 		return errors.New("ファイルが指定されていません")
 	}
 
+	ctx := context.Background()
 	p := parser.New()
-	posts, err := p.ParseFiles(files)
-	if err != nil {
-		return fmt.Errorf("ファイルの解析に失敗しました: %w", err)
-	}
 
-	for _, post := range posts {
+	for _, file := range files {
+		post, err := p.ParseFile(ctx, file)
+		if err != nil {
+			fmt.Printf("%s の解析に失敗: %v\n", file, err)
+			continue
+		}
 		fmt.Printf("タイトル: %s\n", post.Title)
 		fmt.Printf("スラッグ: %s\n", post.Slug)
 		fmt.Printf("要約: %s\n", post.Summary)
