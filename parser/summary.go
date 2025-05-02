@@ -108,7 +108,7 @@ func (p *HTMLParser) GenerateSummary(content string) (string, error) {
 
 	sentences := p.splitSentences(text)
 	if len(sentences) <= 2 {
-		return text, nil
+		return truncateSummary(text), nil
 	}
 
 	// 形態素解析と文のベクトル化
@@ -156,7 +156,18 @@ func (p *HTMLParser) GenerateSummary(content string) (string, error) {
 		}
 	}
 
-	return strings.Join(summary, ""), nil
+	summaryText := strings.Join(summary, "")
+	return truncateSummary(summaryText), nil
+}
+
+// summaryを100文字までにし、超える場合は「・・・」を付与
+func truncateSummary(s string) string {
+	runes := []rune(s)
+	maxLen := 300
+	if len(runes) > maxLen {
+		return string(runes[:maxLen]) + "・・・"
+	}
+	return s
 }
 
 // processVectors は文のベクトル化を行います

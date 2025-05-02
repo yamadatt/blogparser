@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -17,10 +18,10 @@ import (
 
 // Parser はブログ記事をパースするためのインターフェースです。
 type Parser interface {
-	// ParseFiles は複数のファイルパスからブログ記事を解析します。
-	ParseFiles(paths []string) ([]*models.BlogPost, error)
+	// ParseFile はファイルパスからブログ記事を解析します。
+	ParseFile(ctx context.Context, path string) (*models.BlogPost, error)
 	// Parse はio.Readerからブログ記事を解析します。
-	Parse(r io.Reader) (*models.BlogPost, error)
+	// Parse(ctx context.Context, r io.Reader) (*models.BlogPost, error)
 }
 
 // HTMLParser はHTMLファイルからブログ記事を解析するパーサーです。
@@ -35,41 +36,31 @@ func New() Parser {
 	}
 }
 
-// ParseFiles は複数のファイルパスからブログ記事を解析します。
-func (p *HTMLParser) ParseFiles(paths []string) ([]*models.BlogPost, error) {
-	var posts []*models.BlogPost
-	var errMsgs []string
+// ParseFile はファイルパスからブログ記事を解析します。
+func (p *HTMLParser) ParseFile(ctx context.Context, path string) (*models.BlogPost, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("ファイル %s を開けません: %w", path, err)
+	}
+	defer f.Close()
 
-	for _, path := range paths {
-		f, err := os.Open(path)
-		if err != nil {
-			errMsgs = append(errMsgs, fmt.Sprintf("ファイル %s を開けません: %v", path, err))
-			continue
-		}
-
-		post, err := p.Parse(f)
-		f.Close()
-		if err != nil {
-			errMsgs = append(errMsgs, fmt.Sprintf("ファイル %s の解析に失敗: %v", path, err))
-			continue
-		}
-
-		// ファイル名（拡張子あり）をSlugにセット
-		post.Slug = filepath.Base(path)
-
-		posts = append(posts, post)
+	post, err := p.Parse(ctx, f)
+	if err != nil {
+		return nil, fmt.Errorf("ファイル %s の解析に失敗: %w", path, err)
 	}
 
-	if len(errMsgs) > 0 {
-		return posts, fmt.Errorf("%d 件のエラーが発生しました:\n- %s",
-			len(errMsgs), strings.Join(errMsgs, "\n- "))
-	}
-
-	return posts, nil
+	post.Slug = filepath.Base(path)
+	return post, nil
 }
 
 // Parse はio.Readerからブログ記事を解析します。
-func (p *HTMLParser) Parse(r io.Reader) (*models.BlogPost, error) {
+func (p *HTMLParser) Parse(ctx context.Context, r io.Reader) (*models.BlogPost, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
 	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("HTMLのパースに失敗しました: %w", err)

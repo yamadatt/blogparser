@@ -1,4 +1,4 @@
-module github.com/yourusername/blogparser
+module github.com/yamadatt/blogparser
 
 go 1.24.2
 
