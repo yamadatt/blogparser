@@ -2,6 +2,8 @@
 
 ブログ記事ファイル（HTML/Markdown）からメタデータ・本文・要約を抽出するGo言語パーサー
 
+[Deepwiki](https://deepwiki.com/yamadatt/blogparser)
+
 ## 概要
 
 このパッケージは、与えられたブログ記事ファイルから以下の情報を抽出します：
