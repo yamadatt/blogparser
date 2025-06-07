@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"golang.org/x/net/html"
 )
 
 var (
@@ -101,43 +100,6 @@ func (p *HTMLParser) removeByRegex(content string) string {
 		content = re.ReplaceAllString(content, "")
 	}
 	return content
-}
-
-// renderNode はHTMLノードを文字列に変換します（コメントノードは除外）
-func (p *HTMLParser) renderNode(buf *strings.Builder, node *html.Node) {
-	if node.Type == html.CommentNode {
-		return
-	}
-
-	switch node.Type {
-	case html.TextNode:
-		buf.WriteString(node.Data)
-	case html.ElementNode:
-		buf.WriteByte('<')
-		buf.WriteString(node.Data)
-		for _, attr := range node.Attr {
-			buf.WriteByte(' ')
-			buf.WriteString(attr.Key)
-			buf.WriteString(`="`)
-			buf.WriteString(attr.Val)
-			buf.WriteByte('"')
-		}
-		if node.FirstChild != nil {
-			buf.WriteByte('>')
-			for c := node.FirstChild; c != nil; c = c.NextSibling {
-				p.renderNode(buf, c)
-			}
-			buf.WriteString("</")
-			buf.WriteString(node.Data)
-			buf.WriteByte('>')
-		} else {
-			buf.WriteString("/>")
-		}
-	}
-
-	if node.NextSibling != nil {
-		p.renderNode(buf, node.NextSibling)
-	}
 }
 
 // normalizeWhitespace は空白や改行を正規化します
