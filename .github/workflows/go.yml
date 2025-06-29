@@ -38,3 +38,26 @@ jobs:
 
       - name: Generate timeline
         uses: Kesin11/actions-timeline@v2
+
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run benchmark tests
+        run: go test -bench=. -benchmem -run=^$ ./...
+
+      - name: Generate timeline
+        uses: Kesin11/actions-timeline@v2
+
