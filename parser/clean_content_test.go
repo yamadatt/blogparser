@@ -91,3 +91,85 @@ func TestCleanContent(t *testing.T) {
 		})
 	}
 }
+
+func TestCleanContentEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		{
+			name:     "非常に長いHTML",
+			input:    `<div>` + strings.Repeat("テスト", 10000) + `</div>`,
+			expected: `<div>` + strings.Repeat("テスト", 10000) + `</div>`,
+			wantErr:  false,
+		},
+		{
+			name:     "ネストしたscriptタグ",
+			input:    `<div><script><script>alert('nested');</script></script>本文</div>`,
+			expected: `<div>本文</div>`,
+			wantErr:  false,
+		},
+		{
+			name:     "複数のHTMLコメント",
+			input:    `<div><!-- コメント1 -->本文<!-- コメント2 --></div>`,
+			expected: `<div>本文</div>`,
+			wantErr:  false,
+		},
+		{
+			name:     "特殊文字を含むHTML",
+			input:    `<div>&lt;&gt;&amp;&quot;&#39;</div>`,
+			expected: `<div>&lt;&gt;&amp;&#34;&#39;</div>`,
+			wantErr:  false,
+		},
+		{
+			name:     "空白のみのHTML",
+			input:    `   <div>   </div>   `,
+			expected: `<div>   </div>`,
+			wantErr:  false,
+		},
+		{
+			name:     "bodyタグのみ",
+			input:    `<body>本文</body>`,
+			expected: `本文`,
+			wantErr:  false,
+		},
+		{
+			name:     "複数のadsbygoogleクラス",
+			input:    `<div class="skin-entryBody"><div class="adsbygoogle">広告1</div><div>本文</div><div class="adsbygoogle">広告2</div></div>`,
+			expected: `<div class="skin-entryBody"><div>本文</div></div>`,
+			wantErr:  false,
+		},
+		{
+			name:     "順位表記の複数パターン",
+			input:    `<div>１位：テスト ３位：テスト</div>`,
+			expected: `<div>テスト テスト</div>`,
+			wantErr:  false,
+		},
+	}
+
+	parser := &HTMLParser{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := parser.CleanContent(tt.input)
+			result = strings.TrimSpace(result)
+			
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("CleanContent() error = nil, want error")
+				}
+				return
+			}
+			
+			if err != nil {
+				t.Errorf("CleanContent() error = %v, want nil", err)
+				return
+			}
+			
+			if result != tt.expected {
+				t.Errorf("CleanContent() = %v, want %v", result, tt.expected)
+			}
+		})
+	}
+}

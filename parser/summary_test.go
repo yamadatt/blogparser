@@ -104,3 +104,165 @@ func TestGenerateSummary(t *testing.T) {
 		t.Error("GenerateSummary empty content should error")
 	}
 }
+
+func TestGenerateSummaryEdgeCases(t *testing.T) {
+	tests := []struct {
+		name     string
+		content  string
+		wantErr  bool
+		minLen   int
+	}{
+		{
+			name:    "短いコンテンツ",
+			content: `<html><body>短い。</body></html>`,
+			wantErr: false,
+			minLen:  1,
+		},
+		{
+			name:    "長いコンテンツ",
+			content: `<html><body>` + strings.Repeat("これは長い文章です。", 100) + `</body></html>`,
+			wantErr: false,
+			minLen:  1,
+		},
+		{
+			name:    "HTMLタグのみ",
+			content: `<html><body><div><span></span></div></body></html>`,
+			wantErr: false,
+			minLen:  0,
+		},
+		{
+			name:    "特殊文字を含む",
+			content: `<html><body>これは&lt;特殊&gt;文字です。&amp;記号も含みます。</body></html>`,
+			wantErr: false,
+			minLen:  1,
+		},
+		{
+			name:    "数字のみ",
+			content: `<html><body>123456789。</body></html>`,
+			wantErr: false,
+			minLen:  1,
+		},
+		{
+			name:    "英語コンテンツ",
+			content: `<html><body>This is English content. It should work too.</body></html>`,
+			wantErr: false,
+			minLen:  1,
+		},
+		{
+			name:    "混合言語",
+			content: `<html><body>これはJapanese and English混合です。Very interesting content.</body></html>`,
+			wantErr: false,
+			minLen:  1,
+		},
+	}
+
+	p := &HTMLParser{}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := p.GenerateSummary(tt.content)
+			
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("GenerateSummary() error = nil, want error")
+				}
+				return
+			}
+			
+			if err != nil {
+				t.Errorf("GenerateSummary() error = %v, want nil", err)
+				return
+			}
+			
+			if len(result) < tt.minLen {
+				t.Errorf("GenerateSummary() result length = %d, want >= %d", len(result), tt.minLen)
+			}
+		})
+	}
+}
+
+func TestTokenizeEdgeCases(t *testing.T) {
+	p := &HTMLParser{}
+	
+	tests := []struct {
+		name     string
+		text     string
+		expected int // 期待される単語数の最小値
+	}{
+		{
+			name:     "空文字列",
+			text:     "",
+			expected: 0,
+		},
+		{
+			name:     "空白のみ",
+			text:     "   \n\t  ",
+			expected: 0,
+		},
+		{
+			name:     "日本語文章",
+			text:     "今日は良い天気です。",
+			expected: 1,
+		},
+		{
+			name:     "英語文章",
+			text:     "This is a test.",
+			expected: 1,
+		},
+		{
+			name:     "数字のみ",
+			text:     "123456",
+			expected: 0,
+		},
+		{
+			name:     "記号のみ",
+			text:     "！？。、",
+			expected: 0,
+		},
+		{
+			name:     "非常に長いテキスト",
+			text:     strings.Repeat("これは長いテキストです。", 1000),
+			expected: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			words, err := p.tokenize(tt.text)
+			if err != nil {
+				t.Errorf("tokenize() error = %v, want nil", err)
+				return
+			}
+			if len(words) < tt.expected {
+				t.Errorf("tokenize() returned %d words, want >= %d", len(words), tt.expected)
+			}
+		})
+	}
+}
+
+func TestProcessVectors(t *testing.T) {
+	p := &HTMLParser{}
+	
+	// 空のベクターリスト
+	vectors := make([][]Word, 0)
+	sentences := []string{}
+	err := p.processVectors(vectors, sentences)
+	if err != nil {
+		t.Errorf("processVectors() with empty input should not error, got: %v", err)
+	}
+	
+	// 単一のベクター
+	singleVectors := make([][]Word, 1)
+	singleSentences := []string{"テスト文章"}
+	err = p.processVectors(singleVectors, singleSentences)
+	if err != nil {
+		t.Errorf("processVectors() with single vector should not error, got: %v", err)
+	}
+	
+	// 複数のベクター
+	multipleVectors := make([][]Word, 3)
+	multipleSentences := []string{"テスト文章1", "テスト文章2", "テスト文章3"}
+	err = p.processVectors(multipleVectors, multipleSentences)
+	if err != nil {
+		t.Errorf("processVectors() with multiple vectors should not error, got: %v", err)
+	}
+}

@@ -21,7 +21,7 @@ type Parser interface {
 	// ParseFile はファイルパスからブログ記事を解析します。
 	ParseFile(ctx context.Context, path string) (*models.BlogPost, error)
 	// Parse はio.Readerからブログ記事を解析します。
-	// Parse(ctx context.Context, r io.Reader) (*models.BlogPost, error)
+	Parse(ctx context.Context, r io.Reader) (*models.BlogPost, error)
 }
 
 // HTMLParser はHTMLファイルからブログ記事を解析するパーサーです。
@@ -45,7 +45,11 @@ func (p *HTMLParser) ParseFile(ctx context.Context, path string) (*models.BlogPo
 	if err != nil {
 		return nil, fmt.Errorf("ファイル %s を開けません: %w", path, err)
 	}
-	defer f.Close()
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			p.logger.Warn("ファイルのクローズに失敗しました", zap.String("path", path), zap.Error(closeErr))
+		}
+	}()
 
 	post, err := p.Parse(ctx, f)
 	if err != nil {
